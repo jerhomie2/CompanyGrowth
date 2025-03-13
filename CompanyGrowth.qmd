@@ -7,17 +7,19 @@ editor: visual
 ```{r setup}
 library(tidyverse)
 library(vroom)
+library(zoo)
+library(forecast)
 
 data <- vroom('CompanyGrowth.csv')
 data <- data %>%
-  mutate(yearqrtr = paste(Year, Qrtr, sep = "-"))
+  mutate(date = as.Date(as.yearqtr(paste(Year, Qrtr, sep = "-"))))
 ```
 
 ## EDA
 
 ```{r}
 # growth stays about the same throughout
-ggplot(data=data, aes(x=yearqrtr, y=PctGrowth)) +
+ggplot(data=data, aes(x=date, y=PctGrowth)) +
   geom_point()
 # Change in Income
 ggplot(data=data, aes(x=Income, y=PctGrowth)) +
@@ -38,6 +40,31 @@ ggplot(data=data, aes(x=Unemployment, y=PctGrowth)) +
     ```{r}
     # basic linear model
     growth.lm <- lm(PctGrowth ~ Income + Production + Savings + Unemployment, data=data)
+
+    # lm models for each predictor
+    new_data <- data.frame(Year = 2025,
+                           Qrtr = c(1,2,3,4))
+    income.lm <- lm(Income~Year+Qrtr, data=data)
+    income_lm_preds <- predict(income.lm, newdata = new_data)
+    production.lm <- lm(Production~Year+Qrtr, data=data)
+    production_lm_preds <- predict(production.lm, newdata = new_data)
+    savings.lm <- lm(Savings~Year+Qrtr, data=data)
+    savings_lm_preds <- predict(savings.lm, newdata = new_data)
+    unemployment.lm <- lm(Unemployment~Year+Qrtr, data=data)
+    unemployment_lm_preds <- predict(unemployment.lm, newdata = new_data)
+
+    # predict growth
+    growth_new_data <- data.frame(Income = income_lm_preds,
+                                  Production = production_lm_preds,
+                                  Savings = savings_lm_preds,
+                                  Unemployment = unemployment_lm_preds)
+    predict(growth.lm, growth_new_data)
+
+    ## how well does our model predict
+    # r^2
+    summary(growth.lm)$r.squared
+    # rmse
+    rmse <- sqrt(mean(residuals(growth.lm)^2))
     ```
 
 2.  Describe at least 2 alternative models that could be used to do the projections and emphasize how they differ from the current method.
@@ -45,10 +72,17 @@ ggplot(data=data, aes(x=Unemployment, y=PctGrowth)) +
     ```{r}
     # new linear model accounting for date features and with spline and what not
 
-    # facebook prophet (maybe not this one because it won't account for other variables)
+    # facebook prophet (maybe or maybe not this one because it won't account for other variables)
+    ```
 
+    ```{r}
     # ARIMA
-
+    ## Define response as time series object with a frequency S
+    ts_data <- ts(data=data$PctGrowth, frequency=4)
+    X_noInt <- model.matrix(growth.lm)[,-1]
+    arima_model <- auto.arima(y=ts_data,xreg=X_noInt)
+    summary(arima_model)
+    coef(arima_model)
     ```
 
 3.  Compare these 2 new methods to the current method in terms of ability to predict and the 2025 projections. Be sure to describe how you obtained the 2025 predictions. (predict for all variables, not just the response)
