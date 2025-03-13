@@ -1,0 +1,56 @@
+---
+title: "Company Growth"
+format: pdf
+editor: visual
+---
+
+```{r setup}
+library(tidyverse)
+library(vroom)
+
+data <- vroom('CompanyGrowth.csv')
+data <- data %>%
+  mutate(yearqrtr = paste(Year, Qrtr, sep = "-"))
+```
+
+## EDA
+
+```{r}
+# growth stays about the same throughout
+ggplot(data=data, aes(x=yearqrtr, y=PctGrowth)) +
+  geom_point()
+# Change in Income
+ggplot(data=data, aes(x=Income, y=PctGrowth)) +
+  geom_point()
+# Change in Production
+ggplot(data=data, aes(x=Production, y=PctGrowth)) +
+  geom_point()
+# Change in Savings
+ggplot(data=data, aes(x=Savings, y=PctGrowth)) +
+  geom_point()
+# Change in Unemployment
+ggplot(data=data, aes(x=Unemployment, y=PctGrowth)) +
+  geom_point()
+```
+
+1.  Describe the model you are currently using, how it performs for predictions and what the 2025 projections are under this model. Be sure to describe how you obtained the 2025 predictions. Company Growth ForecastingProblem Background Growth = β0 + β1Income + β2Production + β3Savings + β4Unemployment + ϵi ϵi iid ∼ N (0, σ2)
+
+    ```{r}
+    # basic linear model
+    growth.lm <- lm(PctGrowth ~ Income + Production + Savings + Unemployment, data=data)
+    ```
+
+2.  Describe at least 2 alternative models that could be used to do the projections and emphasize how they differ from the current method.
+
+    ```{r}
+    # new linear model accounting for date features and with spline and what not
+
+    # facebook prophet (maybe not this one because it won't account for other variables)
+
+    # ARIMA
+
+    ```
+
+3.  Compare these 2 new methods to the current method in terms of ability to predict and the 2025 projections. Be sure to describe how you obtained the 2025 predictions. (predict for all variables, not just the response)
+
+4.  The board is particularly interested to know how Income, Production, Savings and Unemployment relate to company growth. Use your preferred method (among the 3 or more you consider here) to illustrate this relationship.
