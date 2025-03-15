@@ -70,7 +70,7 @@ ggplot(data=data, aes(x=Unemployment, y=PctGrowth)) +
 2.  Describe at least 2 alternative models that could be used to do the projections and emphasize how they differ from the current method.
 
     ```{r}
-    # new linear model accounting for date features and with spline and what not
+    # new linear model accounting for date features and maybe with spline and what not
 
     # facebook prophet (maybe or maybe not this one because it won't account for other variables)
     ```
