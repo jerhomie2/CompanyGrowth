@@ -87,4 +87,8 @@ ggplot(data=data, aes(x=Unemployment, y=PctGrowth)) +
 
 3.  Compare these 2 new methods to the current method in terms of ability to predict and the 2025 projections. Be sure to describe how you obtained the 2025 predictions. (predict for all variables, not just the response)
 
+    ```{r}
+
+    ```
+
 4.  The board is particularly interested to know how Income, Production, Savings and Unemployment relate to company growth. Use your preferred method (among the 3 or more you consider here) to illustrate this relationship.
