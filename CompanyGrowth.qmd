@@ -11,6 +11,8 @@ library(vroom)
 library(zoo)
 library(forecast)
 library(splines)
+library(prophet)
+library(Metrics)
 
 data <- vroom('CompanyGrowth.csv')
 data <- data %>%
@@ -43,6 +45,11 @@ ggplot(data=data, aes(x=Unemployment, y=PctGrowth)) +
     # basic linear model
     growth.lm <- lm(PctGrowth ~ Income + Production + Savings + Unemployment, data=data)
 
+    data %>%
+      ggplot(aes(x = date, y = PctGrowth)) +
+      geom_point() +
+      geom_line(aes(y = growth.lm$fitted.values), col = 'red')
+
     # lm models for each predictor
     new_data <- data.frame(Year = 2025,
                            Qrtr = c(1,2,3,4))
@@ -60,14 +67,16 @@ ggplot(data=data, aes(x=Unemployment, y=PctGrowth)) +
                                   Production = production_lm_preds,
                                   Savings = savings_lm_preds,
                                   Unemployment = unemployment_lm_preds)
-    predict(growth.lm, growth_new_data)
+    lm_preds <- predict(growth.lm, growth_new_data)
+    lm_preds
 
     ## how well does our model predict
     # r^2
-    summary(growth.lm)$r.squared
+    lm_r2 <- summary(growth.lm)$r.squared
+    lm_r2
     # rmse
-    rmse <- sqrt(mean(residuals(growth.lm)^2))
-    rmse
+    lm_rmse <- sqrt(mean(residuals(growth.lm)^2))
+    lm_rmse
     ```
 
 2.  Describe at least 2 alternative models that could be used to do the projections and emphasize how they differ from the current method.
@@ -101,14 +110,40 @@ ggplot(data=data, aes(x=Unemployment, y=PctGrowth)) +
         Savings = savings_lm_preds,
         Unemployment = unemployment_lm_preds)
 
-    predict(spline_model, newdata = future_features)
+    spline_preds <- predict(spline_model, newdata = future_features)
+    spline_preds
 
-    summary(spline_model)$r.squared
+    spline_r2 <- summary(spline_model)$r.squared
+    spline_r2
 
-    rmse_spline <- sqrt(mean(residuals(spline_model)^2))
-    rmse_spline
+    spline_rmse <- sqrt(mean(residuals(spline_model)^2))
+    spline_rmse
     # facebook prophet (maybe or maybe not this one because it won't account for other variables)
+    prophet_df <- data %>%
+      rename(y = PctGrowth, ds = date) %>% 
+      dplyr::select(y, ds)
+    prophet_model <- prophet_model <- prophet(prophet_df, yearly.seasonality = TRUE, 
+                                              weekly.seasonality = TRUE,
+                                              daily.seasonality = TRUE)
+    prophet_fitted <- predict(prophet_model) %>% pull(yhat)
 
+    prophet_df %>%
+      ggplot(aes(x = ds, y = y)) +
+      geom_point() +
+      geom_line(aes(y = prophet_fitted), col = 'red')
+
+    prophet_future <- future_features %>%
+      rename(ds = date) %>%
+      dplyr::select(ds)
+    prophet_preds <- predict(prophet_model, prophet_future)$yhat
+    prophet_preds
+
+    prophet_r2 <- 1 - sum((prophet_df$y - prophet_fitted)^2) / 
+      sum((prophet_df$y - mean(prophet_df$y))^2)
+    prophet_r2
+
+    prophet_rmse <- sqrt(mean((prophet_df$y - prophet_fitted)^2))
+    prophet_rmse
     ```
 
     ```{r}
