@@ -67,6 +67,7 @@ ggplot(data=data, aes(x=Unemployment, y=PctGrowth)) +
     summary(growth.lm)$r.squared
     # rmse
     rmse <- sqrt(mean(residuals(growth.lm)^2))
+    rmse
     ```
 
 2.  Describe at least 2 alternative models that could be used to do the projections and emphasize how they differ from the current method.
@@ -79,14 +80,35 @@ ggplot(data=data, aes(x=Unemployment, y=PctGrowth)) +
              DOW = wday(date, label = TRUE),
              Numeric_date = decimal_date(date))
 
-    spline_model <- lm(PctGrowth ~ bs(date, knots = c(1975, 1990, 2005, 2020), degree = 3) +
+    spline_model <- lm(PctGrowth ~ bs(Numeric_date, knots = c(1975, 1990, 2005, 2020), degree = 3) +
     ., data = data_date_features)
 
     data_date_features %>%
     ggplot(aes(x = date, y = PctGrowth)) +
     geom_point() +
     geom_line(aes(y = spline_model$fitted.values), col = 'red')
+
+    future_dates <- seq(from = as.yearqtr("2025 Q1"), to = as.yearqtr("2025 Q4"), by = 1/4)
+    future_dates <- as.Date(as.yearqtr(future_dates), frac = 0)
+    future_features <- tibble(date = future_dates) %>%
+      mutate(Year = year(date),
+        Month = month(date, label = TRUE),
+        DOW = wday(date, label = TRUE),
+        Numeric_date = decimal_date(date),
+        Qrtr = quarter(date, with_year = FALSE, fiscal_start = 1),
+        Income = income_lm_preds,
+        Production = production_lm_preds,
+        Savings = savings_lm_preds,
+        Unemployment = unemployment_lm_preds)
+
+    predict(spline_model, newdata = future_features)
+
+    summary(spline_model)$r.squared
+
+    rmse_spline <- sqrt(mean(residuals(spline_model)^2))
+    rmse_spline
     # facebook prophet (maybe or maybe not this one because it won't account for other variables)
+
     ```
 
     ```{r}
