@@ -12,7 +12,7 @@ library(zoo)
 library(forecast)
 library(splines)
 library(prophet)
-library(Metrics)
+library(yardstick)
 
 data <- vroom('CompanyGrowth.csv')
 data <- data %>%
@@ -89,8 +89,8 @@ ggplot(data=data, aes(x=Unemployment, y=PctGrowth)) +
              DOW = wday(date, label = TRUE),
              Numeric_date = decimal_date(date))
 
-    spline_model <- lm(PctGrowth ~ bs(Numeric_date, knots = c(1975, 1990, 2005, 2020), degree = 3) +
-    ., data = data_date_features)
+    spline_model <- lm(PctGrowth ~ bs(Numeric_date, knots = c(1975, 1990, 2005, 2020), 
+                                      degree = 3) +., data = data_date_features)
 
     data_date_features %>%
     ggplot(aes(x = date, y = PctGrowth)) +
@@ -152,14 +152,34 @@ ggplot(data=data, aes(x=Unemployment, y=PctGrowth)) +
     ts_data <- ts(data=data$PctGrowth, frequency=4)
     X_noInt <- model.matrix(growth.lm)[,-1]
     arima_model <- auto.arima(y=ts_data,xreg=X_noInt)
-    summary(arima_model)
-    coef(arima_model)
+
+    data %>%
+      ggplot(aes(x = date, y = PctGrowth)) +
+      geom_point() +
+      geom_line(aes(y = fitted(arima_model)), col = 'red')
+
+    x_future <- model.matrix(growth.lm, data = data)[,-1]
+    arima_preds <- forecast(arima_model, xreg = x_future, level = 95)$mean
+
+
+    arima_r2 <- cor(fitted(arima_model), data$PctGrowth)^2
+    arima_r2
+
+    arima_rmse <- rmse_vec(data$PctGrowth, fitted(arima_model))
+    arima_rmse
     ```
 
 3.  Compare these 2 new methods to the current method in terms of ability to predict and the 2025 projections. Be sure to describe how you obtained the 2025 predictions. (predict for all variables, not just the response)
 
     ```{r}
+    # Basic lm model
+    data %>%
+      ggplot(aes(x = date, y = PctGrowth)) +
+      geom_point() +
+      geom_line(aes(y = growth.lm$fitted.values), col = 'red')
 
+    print(paste('R2 value:', lm_r2))
+    print(paste('RMSE:', lm_rmse))
     ```
 
 4.  The board is particularly interested to know how Income, Production, Savings and Unemployment relate to company growth. Use your preferred method (among the 3 or more you consider here) to illustrate this relationship.
