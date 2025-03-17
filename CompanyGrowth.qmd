@@ -17,6 +17,7 @@ library(yardstick)
 data <- vroom('CompanyGrowth.csv')
 data <- data %>%
   mutate(date = as.Date(as.yearqtr(paste(Year, Qrtr, sep = "-"))))
+
 ```
 
 ## EDA
@@ -70,7 +71,7 @@ ggplot(data=data, aes(x=Unemployment, y=PctGrowth)) +
     lm_preds <- predict(growth.lm, growth_new_data)
     lm_preds
 
-    ## how well does our model predict
+    ## how well does our model predicts
     # r^2
     lm_r2 <- summary(growth.lm)$r.squared
     lm_r2
@@ -182,4 +183,97 @@ ggplot(data=data, aes(x=Unemployment, y=PctGrowth)) +
     print(paste('RMSE:', lm_rmse))
     ```
 
+    ## CV
+
+    ```{r}
+    # lm
+    cv <- function(fold_num){
+      ## Split into train-validation sets
+      validationSet <- data %>%
+        filter(folds==fold_num)
+      trainSet <- data %>%
+        filter(folds!=fold_num)
+      
+      # Ensure factors have at least two levels (drop unused levels)
+      trainSet <- droplevels(trainSet)
+      validationSet <- droplevels(validationSet)
+
+      ## Fit a model and predict
+      trainModel <- lm(PctGrowth~., data = trainSet)
+      preds <- predict.lm(trainModel, newdata=validationSet)
+
+      ## Validate the predictions
+      rmse <- yardstick::rmse_vec(truth=validationSet$PctGrowth, estimate=preds)
+      
+      return(rmse)
+    }
+
+    K <- 25
+    folds <- rep(1:K, length = nrow(data)) %>%
+      sample()
+    rmse_results <- sapply(1:K, FUN=cv)
+    my_hist <- ggplot() + 
+      geom_histogram(mapping=aes(x=rmse_results)) +
+      ggtitle("My LM")
+    paste0('Ave lm rmse: ', mean(rmse_results))
+
+    # spline
+    cv <- function(fold_num){
+      ## Split into train-validation sets
+      validationSet <- data_date_features %>%
+        filter(folds==fold_num)
+      trainSet <- data_date_features %>%
+        filter(folds!=fold_num)
+      
+      # Ensure factors have at least two levels (drop unused levels)
+      trainSet <- droplevels(trainSet)
+      validationSet <- droplevels(validationSet)
+
+      ## Fit a model and predict
+      trainModel <- lm(PctGrowth~bs(Numeric_date, knots = c(1975, 1990, 2005, 2020), degree = 3) + ., data = trainSet)
+      preds <- predict.lm(trainModel, newdata=validationSet)
+
+      ## Validate the predictions
+      rmse <- yardstick::rmse_vec(truth=validationSet$PctGrowth, estimate=preds)
+      
+      return(rmse)
+    }
+
+    K <- 25
+    folds <- rep(1:K, length = nrow(data_date_features)) %>%
+      sample()
+    rmse_results <- sapply(1:K, FUN=cv)
+    my_hist <- ggplot() + 
+      geom_histogram(mapping=aes(x=rmse_results)) +
+      ggtitle("Spline Model")
+    paste0('Ave spline rmse: ', mean(rmse_results))
+
+    # arima
+    train <- data %>%
+      filter(date<as.Date('2015-01-01'))
+    test <- train <- data %>%
+      filter(date>=as.Date('2015-01-01'))
+
+    X_train <- X_noInt[data$date<as.Date('2015-01-01'),]
+    X_validate <- X_noInt[data$date>=as.Date('2015-01-01'),]
+    train.ts <- ts(data=train$PctGrowth, frequency = 4)
+    train.arima <- auto.arima(y=train.ts,xreg = X_train)
+
+    # predictions
+    arima.preds <- forecast(train.arima,xreg=X_validate,level=95)$mean
+    arima.fitted <- fitted(train.arima)
+
+    #rmse
+    arima.data <- tibble(truth=test$PctGrowth,estimate=arima.preds)
+    arima.rmse <- rmse(data=arima.data,truth=truth,estimate=estimate)
+    ```
+
 4.  The board is particularly interested to know how Income, Production, Savings and Unemployment relate to company growth. Use your preferred method (among the 3 or more you consider here) to illustrate this relationship.
+
+```{r}
+summary(train.arima)
+```
+
+```{r}
+
+```
