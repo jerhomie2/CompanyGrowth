@@ -183,80 +183,64 @@ ggplot(data=data, aes(x=Unemployment, y=PctGrowth)) +
     print(paste('RMSE:', lm_rmse))
     ```
 
-    ## CV
+    ## How Well Does Each Model Perform
 
     ```{r}
-    # lm
-    cv <- function(fold_num){
-      ## Split into train-validation sets
-      validationSet <- data %>%
-        filter(folds==fold_num)
-      trainSet <- data %>%
-        filter(folds!=fold_num)
-      
-      # Ensure factors have at least two levels (drop unused levels)
-      trainSet <- droplevels(trainSet)
-      validationSet <- droplevels(validationSet)
-
-      ## Fit a model and predict
-      trainModel <- lm(PctGrowth~., data = trainSet)
-      preds <- predict.lm(trainModel, newdata=validationSet)
-
-      ## Validate the predictions
-      rmse <- yardstick::rmse_vec(truth=validationSet$PctGrowth, estimate=preds)
-      
-      return(rmse)
-    }
-
-    K <- 25
-    folds <- rep(1:K, length = nrow(data)) %>%
-      sample()
-    rmse_results <- sapply(1:K, FUN=cv)
-    my_hist <- ggplot() + 
-      geom_histogram(mapping=aes(x=rmse_results)) +
-      ggtitle("My LM")
-    paste0('Ave lm rmse: ', mean(rmse_results))
-
-    # spline
-    cv <- function(fold_num){
-      ## Split into train-validation sets
-      validationSet <- data_date_features %>%
-        filter(folds==fold_num)
-      trainSet <- data_date_features %>%
-        filter(folds!=fold_num)
-      
-      # Ensure factors have at least two levels (drop unused levels)
-      trainSet <- droplevels(trainSet)
-      validationSet <- droplevels(validationSet)
-
-      ## Fit a model and predict
-      trainModel <- lm(PctGrowth~bs(Numeric_date, knots = c(1975, 1990, 2005, 2020), degree = 3) + ., data = trainSet)
-      preds <- predict.lm(trainModel, newdata=validationSet)
-
-      ## Validate the predictions
-      rmse <- yardstick::rmse_vec(truth=validationSet$PctGrowth, estimate=preds)
-      
-      return(rmse)
-    }
-
-    K <- 25
-    folds <- rep(1:K, length = nrow(data_date_features)) %>%
-      sample()
-    rmse_results <- sapply(1:K, FUN=cv)
-    my_hist <- ggplot() + 
-      geom_histogram(mapping=aes(x=rmse_results)) +
-      ggtitle("Spline Model")
-    paste0('Ave spline rmse: ', mean(rmse_results))
-
-    # arima
     train <- data %>%
       filter(date<as.Date('2015-01-01'))
     test <- train <- data %>%
       filter(date>=as.Date('2015-01-01'))
+    # lm
+    growth.lm <- lm(PctGrowth ~ Income + Production + Savings + Unemployment, data=train)
 
+    # lm models for each predictor
+    income.lm <- lm(Income~Year+Qrtr, data=train)
+    income_lm_preds <- predict(income.lm, newdata = test)
+    production.lm <- lm(Production~Year+Qrtr, data=train)
+    production_lm_preds <- predict(production.lm, newdata = test)
+    savings.lm <- lm(Savings~Year+Qrtr, data=train)
+    savings_lm_preds <- predict(savings.lm, newdata = test)
+    unemployment.lm <- lm(Unemployment~Year+Qrtr, data=train)
+    unemployment_lm_preds <- predict(unemployment.lm, newdata = test)
+
+    # predict growth
+    growth_new_data <- data.frame(Income = income_lm_preds,
+                                  Production = production_lm_preds,
+                                  Savings = savings_lm_preds,
+                                  Unemployment = unemployment_lm_preds)
+    lm_preds <- predict(growth.lm, growth_new_data)
+    lm_preds
+    #rmse
+    lm_rmse_df <- data.frame(truth = test$PctGrowth, estimate = lm_preds)
+    lm_rmse <- rmse(lm_rmse_df, truth=truth, estimate=estimate)
+
+    # Spline
+    train_with_features <- data_date_features %>%
+      filter(date<as.Date('2015-01-01'))
+    test_with_features <- data_date_features %>%
+      filter(date>=as.Date('2015-01-01'))
+
+    spline_train_model <- lm(PctGrowth ~ ., data = train_with_features)
+
+    income.spline <- lm(Income ~ . -PctGrowth -Production -Savings -Unemployment, data = train_with_features)
+    income_spline_preds <- predict(income.spline, newdata = test)
+    production.spline <- lm(Production ~ . -PctGrowth -Income -Savings -Unemployment, data = train_with_features)
+    production_spline_preds <- predict(production.spline, newdata = test)
+    savings.spline <- lm(Savings~ . -PctGrowth -Income -Production -Unemployment, data=train_with_features)
+    savings_spline_preds <- predict(savings.spline, newdata = test)
+    unemployment.spline <- lm(Unemployment~ . -PctGrowth -Income -Production -Savings, data=train_with_features)
+    unemployment_spline_preds <- predict(unemployment.spline, newdata = test)
+
+    spline_preds <- predict(spline_train_model, test_with_features)
+    spline_preds
+    #rmse
+    spline_rmse_df <- data.frame(truth = test_with_features$PctGrowth, estimate = spline_preds)
+    spline_rmse <- rmse(spline_rmse_df, truth=truth, estimate=estimate)
+
+    # arima
     X_train <- X_noInt[data$date<as.Date('2015-01-01'),]
     X_validate <- X_noInt[data$date>=as.Date('2015-01-01'),]
-    train.ts <- ts(data=train$PctGrowth, frequency = 4)
+    train_ts_data <- ts(data=train$PctGrowth, frequency = 4)
     train.arima <- auto.arima(y=train.ts,xreg = X_train)
 
     # predictions
